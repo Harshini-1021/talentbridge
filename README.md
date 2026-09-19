@@ -9,8 +9,8 @@ each employee's real work history, infers the skills their job title hides,
 scores them against every internal opening, and turns the remaining gap into a
 learning plan.
 
-> **Live:** _pending first deploy — see "Deploying" below_
-> **Repo:** https://github.com/Harshini-1021/talentbridge
+> **Live Demo:** https://talentbridge-ten.vercel.app
+> **GitHub Repo:** https://github.com/Harshini-1021/talentbridge
 
 ---
 
