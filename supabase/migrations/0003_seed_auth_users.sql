@@ -8,13 +8,28 @@
 -- Shared demo password: TalentBridge#2026
 -- Re-running this file is a no-op.
 
-create extension if not exists pgcrypto with schema extensions;
-
 do $$
 declare
   demo_password constant text := 'TalentBridge#2026';
+  ext_schema    text;
   person        record;
+  hashed        text;
 begin
+  -- pgcrypto lives in the "extensions" schema on Supabase, but do not assume
+  -- it: resolve wherever it actually is and put that on the search path, so
+  -- crypt() and gen_salt() resolve on any project.
+  select n.nspname into ext_schema
+  from pg_extension e
+  join pg_namespace n on n.oid = e.extnamespace
+  where e.extname = 'pgcrypto';
+
+  if ext_schema is null then
+    create extension pgcrypto with schema extensions;
+    ext_schema := 'extensions';
+  end if;
+
+  execute format('set local search_path = %I, public', ext_schema);
+
   for person in
     select * from (values
       ('11111111-1111-4111-8111-111111111111'::uuid, 'priya@talentbridge.dev',  'Priya Raman'),
@@ -27,6 +42,8 @@ begin
       ('88888888-8888-4888-8888-888888888888'::uuid, 'daniel@talentbridge.dev', 'Daniel Thomas')
     ) as t(id, email, full_name)
   loop
+    hashed := crypt(demo_password, gen_salt('bf'));
+
     insert into auth.users (
       instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
       raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
@@ -40,24 +57,33 @@ begin
       'authenticated',
       'authenticated',
       person.email,
-      extensions.crypt(demo_password, extensions.gen_salt('bf')),
+      hashed,
       now(),
       '{"provider":"email","providers":["email"]}'::jsonb,
-      jsonb_build_object('full_name', person.full_name),
+      jsonb_build_object('full_name', person.full_name, 'email', person.email),
       now(), now(),
       '', '', '', '', '', '', '', '',
       false, false
     )
     on conflict (id) do nothing;
 
+    -- GoTrue expects an identity row alongside the user for email sign-in.
+    -- id is supplied explicitly rather than relying on a column default, which
+    -- not every project version has.
     insert into auth.identities (
-      provider_id, user_id, identity_data, provider,
+      id, provider_id, user_id, identity_data, provider,
       last_sign_in_at, created_at, updated_at
     )
     values (
+      gen_random_uuid(),
       person.id::text,
       person.id,
-      jsonb_build_object('sub', person.id::text, 'email', person.email, 'email_verified', true),
+      jsonb_build_object(
+        'sub', person.id::text,
+        'email', person.email,
+        'email_verified', true,
+        'phone_verified', false
+      ),
       'email',
       now(), now(), now()
     )

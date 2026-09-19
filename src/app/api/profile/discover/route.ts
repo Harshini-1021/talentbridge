@@ -119,10 +119,14 @@ export async function POST(request: Request) {
         { name: skill.name, category: skill.category },
       ]),
     );
-    const { data: inserted, error } = await supabase
+
+    // ignoreDuplicates makes this ON CONFLICT DO NOTHING rather than DO UPDATE.
+    // tb_skills has an insert policy but deliberately no update policy — names
+    // in a shared taxonomy may be added, never rewritten — so an upsert that
+    // took the update path would be refused by RLS.
+    const { error } = await supabase
       .from("tb_skills")
-      .upsert([...deduped.values()], { onConflict: "name" })
-      .select("*");
+      .upsert([...deduped.values()], { onConflict: "name", ignoreDuplicates: true });
 
     if (error) {
       return NextResponse.json(
@@ -130,7 +134,22 @@ export async function POST(request: Request) {
         { status: 500 },
       );
     }
-    for (const skill of inserted ?? []) {
+
+    // Re-read to pick up ids for both the rows just inserted and any that
+    // already existed under a different casing.
+    const { data: refreshed, error: refreshError } = await supabase
+      .from("tb_skills")
+      .select("*")
+      .in("name", [...deduped.values()].map((skill) => skill.name));
+
+    if (refreshError) {
+      return NextResponse.json(
+        { error: `Could not read the skill taxonomy: ${refreshError.message}` },
+        { status: 500 },
+      );
+    }
+
+    for (const skill of refreshed ?? []) {
       byLowerName.set(skill.name.toLowerCase(), skill);
     }
   }
