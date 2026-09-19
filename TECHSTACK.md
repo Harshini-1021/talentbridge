@@ -110,11 +110,20 @@ Twelve tables, all prefixed `tb_`, defined in `supabase/migrations/`:
 - `0001_schema.sql` — enums, tables, CHECK constraints, indexes on every foreign
   key and every column an RLS policy filters on, `updated_at` triggers.
 - `0002_rls.sql` — RLS enabled on all twelve, policies for employee-self and
-  HR-wide access, column-level `REVOKE` on `tb_profiles.app_role` so privilege
-  escalation is impossible even with a correct-looking update, and
-  `REVOKE UPDATE, DELETE` on the audit table.
+  HR-wide access, and `REVOKE UPDATE, DELETE` on the audit table.
 - `0003_seed_auth_users.sql` — eight real Supabase Auth users.
 - `0004_seed_org_data.sql` — the seeded organisation.
+- `0005_fix_profile_column_grants.sql` — closes a privilege-escalation hole.
+  `0002` tried to stop self-promotion with a column-level
+  `REVOKE UPDATE (app_role)`, which is silently a no-op: Postgres cannot
+  subtract a column from a table-wide grant, and Supabase grants `ALL` on public
+  tables to `authenticated`. An employee could `PATCH` their own `app_role` to
+  `hr` and get a 200. A pre-deploy RLS test caught it. The fix revokes `UPDATE`
+  at the table level and grants it back for only the self-editable columns,
+  adds a trigger pinning `app_role` to `tb_hr_admins`, and the application now
+  derives HR authority from that membership table rather than the column.
+  Data was never exposed — RLS already took authority from `tb_hr_admins`,
+  which has no insert policy — but the app's own UI gate trusted the column.
 
 `auth.uid()` is wrapped in `(select …)` in every policy so Postgres evaluates it
 once per statement rather than once per row.

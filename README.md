@@ -68,9 +68,14 @@ calls no model at all. An LLM never holds a connection to this database.
   the organisation. Enforced in Postgres, not in application code.
 - **No service-role key anywhere in this project.** There is no admin client, so
   there is no code path that can bypass RLS.
-- **Privilege escalation blocked at the column level:** `REVOKE UPDATE
-  (app_role)` on `tb_profiles`, so even a valid-looking update cannot promote
-  anyone.
+- **Privilege escalation is blocked three ways.** `UPDATE` on `tb_profiles` is
+  revoked at the table level and granted back only for the columns a person may
+  edit about themselves, a trigger pins `app_role` to the `tb_hr_admins`
+  membership table, and the app derives HR authority from that same table rather
+  than from the column. Migration `0002` originally tried a column-level
+  `REVOKE`, which is silently a no-op — Postgres cannot subtract a column from a
+  table-wide grant — and a pre-deploy RLS test caught it. See
+  `supabase/migrations/0005_fix_profile_column_grants.sql`.
 - **The audit log is append-only:** no update or delete policy exists, and both
   privileges are revoked from client roles.
 - **Career-assistant conversations are private to the employee** — there is no
@@ -104,7 +109,11 @@ supabase/migrations/0001_schema.sql
 supabase/migrations/0002_rls.sql
 supabase/migrations/0003_seed_auth_users.sql
 supabase/migrations/0004_seed_org_data.sql
+supabase/migrations/0005_fix_profile_column_grants.sql
 ```
+
+`0005` is not optional — it closes the privilege-escalation hole described under
+Security.
 
 Then:
 
