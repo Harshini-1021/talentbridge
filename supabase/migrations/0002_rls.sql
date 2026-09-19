@@ -70,8 +70,11 @@ create policy tb_profiles_update_self on public.tb_profiles
   using (user_id = (select auth.uid()))
   with check (user_id = (select auth.uid()));
 
--- Privilege escalation is blocked at the column level, not merely by policy:
--- even a correct-looking update cannot touch app_role.
+-- NOTE: this line does not work, and 0005 replaces it. Postgres cannot subtract
+-- a column from a table-level grant, and Supabase grants ALL on public tables
+-- to `authenticated`, so this REVOKE is silently a no-op. It is left here
+-- rather than rewritten because it has already been applied; see
+-- 0005_fix_profile_column_grants.sql for the working version.
 revoke update (app_role, user_id, email) on public.tb_profiles from authenticated;
 
 -- ---------------------------------------------------------------------------

@@ -27,5 +27,15 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json({ ok: true });
+  // Where to land is decided here, from the membership table RLS itself
+  // trusts, rather than being guessed by the browser.
+  const { data: membership } = await supabase
+    .from("tb_hr_admins")
+    .select("user_id")
+    .maybeSingle();
+
+  return NextResponse.json({
+    ok: true,
+    redirectTo: membership ? "/hr" : "/dashboard",
+  });
 }

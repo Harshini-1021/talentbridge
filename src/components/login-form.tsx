@@ -47,7 +47,7 @@ export function LoginForm() {
         return;
       }
 
-      router.push("/dashboard");
+      router.push(body.redirectTo === "/hr" ? "/hr" : "/dashboard");
       router.refresh();
     } catch {
       setError("Network problem — check the connection and try again.");

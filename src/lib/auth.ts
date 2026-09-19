@@ -24,11 +24,14 @@ export async function getViewer(): Promise<Viewer | null> {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: profile } = await supabase
-    .from("tb_profiles")
-    .select("*")
-    .eq("user_id", user.id)
-    .maybeSingle<Profile>();
+  const [{ data: profile }, { data: membership }] = await Promise.all([
+    supabase.from("tb_profiles").select("*").eq("user_id", user.id).maybeSingle<Profile>(),
+    // Authority comes from the membership table, which has no insert policy and
+    // is not writable from any client — never from tb_profiles.app_role, which
+    // is an ordinary column on a row the user can update. Deriving the UI gate
+    // from the same table RLS trusts means the two can never disagree.
+    supabase.from("tb_hr_admins").select("user_id").eq("user_id", user.id).maybeSingle(),
+  ]);
 
   if (!profile) return null;
 
@@ -36,7 +39,7 @@ export async function getViewer(): Promise<Viewer | null> {
     supabase,
     userId: user.id,
     profile,
-    isHr: profile.app_role === "hr",
+    isHr: membership !== null,
   };
 }
 
