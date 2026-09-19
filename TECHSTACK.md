@@ -71,8 +71,17 @@ database connection and never sees an id.
 
 ### Model ladder
 
-`gemini-flash-latest` → `gemini-3.1-flash-lite` → `llama-3.3-70b-versatile`
-(Groq). Two models on the same key before a second vendor, because a burst limit
+`gemini-flash-latest` → `gemini-3.1-flash-lite` → `openai/gpt-oss-120b` (Groq).
+
+All three rungs were live-tested on 2026-09-19 while building this, and the test
+is the argument for the design: `gemini-flash-latest` returned **503 "currently
+experiencing high demand"** on the first call, and the Groq id this project was
+originally written against — `llama-3.3-70b-versatile` — returned **404, no
+longer served on this key**. The middle rung answered. A single-provider build
+would have been down at that moment; a two-vendor build with a stale second id
+would have been down too.
+
+Two models on the same key before a second vendor, because a burst limit
 or a model-specific fault is more likely than a whole provider disappearing, and
 a fallback that depends on a second vendor's key still being valid is a fallback
 that silently rots. Each rung has an 8s timeout, and every AI route sets

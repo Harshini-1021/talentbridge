@@ -76,8 +76,17 @@ function geminiRung(model: string): Rung {
   };
 }
 
+/**
+ * Groq's catalogue moves: `llama-3.3-70b-versatile`, the id this project was
+ * originally written against, now returns 404 "does not exist or you do not
+ * have access to it" on this key. Verified against GET /openai/v1/models on
+ * 2026-09-19 — `openai/gpt-oss-120b` is what actually answers, including in
+ * JSON mode. Re-check the list rather than trusting this id from memory.
+ */
+const GROQ_MODEL = "openai/gpt-oss-120b";
+
 const groqRung: Rung = {
-  id: "llama-3.3-70b-versatile",
+  id: GROQ_MODEL,
   async run(prompt, json, signal) {
     const key = process.env.GROQ_API_KEY;
     if (!key) throw new Error("GROQ_API_KEY is not set");
@@ -90,7 +99,7 @@ const groqRung: Rung = {
         authorization: `Bearer ${key}`,
       },
       body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
+        model: GROQ_MODEL,
         temperature: 0.2,
         max_tokens: 2048,
         messages: [{ role: "user", content: prompt }],
